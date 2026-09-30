@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartRoom Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── Reset & Variables ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#263348;--border:#334155;
+  --accent:#3b82f6;--accent2:#06b6d4;--green:#22c55e;--red:#ef4444;
+  --yellow:#f59e0b;--text:#f1f5f9;--muted:#94a3b8;--radius:14px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+header{
+  background:linear-gradient(135deg,#1e3a5f,#0f2a45);
+  padding:18px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{font-size:28px}
+.brand h1{font-size:1.15rem;font-weight:700;color:var(--text)}
+.brand p{font-size:.75rem;color:var(--muted)}
+.header-right{display:flex;align-items:center;gap:14px}
+.last-update{font-size:.78rem;color:var(--muted);text-align:right}
+.spinner{display:none;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+.spinner.active{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Layout ── */
+main{max-width:1100px;margin:0 auto;padding:24px 16px}
+
+/* ── Status Cards ── */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;display:flex;flex-direction:column;gap:6px;
+  box-shadow:var(--shadow);transition:.2s;
+}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.stat-label{font-size:.75rem;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.stat-value{font-size:2rem;font-weight:700;line-height:1.1}
+.stat-unit{font-size:.85rem;color:var(--muted)}
+.stat-sub{font-size:.78rem;color:var(--muted);margin-top:4px}
+.v-temp{color:#f97316}
+.v-hum{color:#06b6d4}
+.v-lamp-on{color:var(--green)}
+.v-lamp-off{color:var(--red)}
+.v-online{color:var(--green)}
+.v-offline{color:var(--red)}
+
+/* ── Badge ── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.78rem;font-weight:700}
+.badge-green{background:#14532d;color:var(--green)}
+.badge-red{background:#450a0a;color:var(--red)}
+.badge-yellow{background:#451a03;color:var(--yellow)}
+.badge-blue{background:#1e3a5f;color:#60a5fa}
+
+/* ── Control Panel ── */
+.control-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:22px;margin-bottom:24px;box-shadow:var(--shadow);
+}
+.control-card h2{font-size:1rem;font-weight:700;margin-bottom:16px;color:var(--text)}
+.lamp-control{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.lamp-status{display:flex;flex-direction:column;gap:4px}
+.lamp-label{font-size:.75rem;color:var(--muted);font-weight:600}
+.lamp-indicator{font-size:1.3rem;font-weight:700}
+.btn-group{display:flex;gap:10px}
+.btn{
+  padding:10px 24px;border:none;border-radius:10px;
+  font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;
+  transition:.15s;display:flex;align-items:center;gap:6px;
+}
+.btn:active{transform:scale(.97)}
+.btn-on{background:var(--green);color:#fff}
+.btn-on:hover{background:#16a34a}
+.btn-off{background:var(--red);color:#fff}
+.btn-off:hover{background:#b91c1c}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.cmd-status{font-size:.8rem;color:var(--muted);margin-top:8px;min-height:20px}
+
+/* ── Charts ── */
+.chart-section{margin-bottom:24px}
+.chart-section h2{font-size:1rem;font-weight:700;margin-bottom:12px}
+.chart-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.chart-toolbar span{font-size:.8rem;color:var(--muted)}
+.range-btn{
+  padding:5px 14px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-size:.8rem;cursor:pointer;
+  font-family:inherit;transition:.15s;
+}
+.range-btn.active,.range-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px}
+.chart-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;box-shadow:var(--shadow);
+}
+.chart-card h3{font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:14px}
+.chart-wrap{position:relative;height:220px}
+
+/* ── Command Log ── */
+.log-section{margin-bottom:24px}
+.log-section h2{font-size:1rem;font-weight:700;margin-bottom:12px}
+.log-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead tr{background:var(--surface2)}
+thead th{padding:10px 14px;text-align:left;font-size:.72rem;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+tbody tr{border-top:1px solid var(--border);transition:.1s}
+tbody tr:hover{background:var(--surface2)}
+tbody td{padding:10px 14px;color:var(--text)}
+.status-waiting{color:var(--yellow);font-weight:600}
+.status-processing{color:var(--accent);font-weight:600}
+.status-executed{color:var(--green);font-weight:600}
+.status-failed{color:var(--red);font-weight:600}
+
+/* ── Config Modal ── */
+.config-btn{
+  background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+  padding:7px 14px;border-radius:8px;font-size:.8rem;cursor:pointer;font-family:inherit;
+}
+.config-btn:hover{border-color:var(--accent);color:var(--text)}
+.modal-overlay{display:none;position:fixed;inset:0;background:#000a;z-index:999;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:440px;box-shadow:var(--shadow)}
+.modal h2{font-size:1rem;font-weight:700;margin-bottom:18px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:5px;font-weight:600}
+.form-group input{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.88rem}
+.form-group input:focus{outline:none;border-color:var(--accent)}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.btn-save{background:var(--accent);color:#fff;padding:8px 20px;border-radius:8px;border:none;font-family:inherit;font-size:.88rem;font-weight:700;cursor:pointer}
+.btn-cancel{background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;border:1px solid var(--border);font-family:inherit;font-size:.88rem;cursor:pointer}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .charts-grid{grid-template-columns:1fr}
+  .lamp-control{flex-direction:column;align-items:flex-start}
+  header{flex-direction:column;gap:10px;text-align:center}
+}
+.no-data{text-align:center;padding:28px;color:var(--muted);font-size:.88rem}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="brand">
+    <div class="brand-icon">🏠</div>
+    <div>
+      <h1>Smart Room Dashboard</h1>
+      <p>IoT Automation System</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="last-update">
+      <div>Last update</div>
+      <div id="lastUpdateTime" style="color:var(--text);font-weight:600">–</div>
+    </div>
+    <div class="spinner" id="spinner"></div>
+    <button class="config-btn" onclick="openConfig()">⚙️ Config</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Status Cards -->
+  <div class="status-grid">
+    <div class="stat-card">
+      <div class="stat-label">🌡️ Temperature</div>
+      <div class="stat-value v-temp" id="tempVal">–</div>
+      <div class="stat-unit">°C</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">💧 Humidity</div>
+      <div class="stat-value v-hum" id="humVal">–</div>
+      <div class="stat-unit">%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">💡 Lamp</div>
+      <div class="stat-value" id="lampVal">–</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">📡 ESP32</div>
+      <div class="stat-value" id="esp32Val">–</div>
+      <div class="stat-sub" id="esp32Sub"></div>
+    </div>
+  </div>
+
+  <!-- Lamp Control -->
+  <div class="control-card">
+    <h2>💡 Device Control</h2>
+    <div class="lamp-control">
+      <div class="lamp-status">
+        <div class="lamp-label">LAMP</div>
+        <div class="lamp-indicator" id="lampIndicator">–</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-on" id="btnOn" onclick="sendCommand('ON')" disabled>
+          ▶ ON
+        </button>
+        <button class="btn btn-off" id="btnOff" onclick="sendCommand('OFF')" disabled>
+          ■ OFF
+        </button>
+      </div>
+    </div>
+    <div class="cmd-status" id="cmdStatus"></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-section">
+    <h2>📈 History</h2>
+    <div class="chart-toolbar">
+      <span>Range:</span>
+      <button class="range-btn active" onclick="setRange('today',this)">Today</button>
+      <button class="range-btn" onclick="setRange('6h',this)">Last 6h</button>
+      <button class="range-btn" onclick="setRange('24h',this)">Last 24h</button>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>🌡️ Temperature (°C)</h3>
+        <div class="chart-wrap"><canvas id="chartTemp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>💧 Humidity (%)</h3>
+        <div class="chart-wrap"><canvas id="chartHum"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Config Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>⚙️ Configuration</h2>
+    <div class="form-group">
+      <label>Google Apps Script URL</label>
+      <input id="cfgUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="form-group">
+      <label>Device ID</label>
+      <input id="cfgDevice" type="text" value="ESP32_01">
+    </div>
+    <div class="form-group">
+      <label>Refresh Interval (วินาที)</label>
+      <input id="cfgInterval" type="number" value="15" min="5" max="120">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeConfig()">ยกเลิก</button>
+      <button class="btn-save" onclick="saveConfig()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIG (เก็บใน localStorage)
+// ─────────────────────────────────────────────
+var cfg = {
+  url     : localStorage.getItem("sr_url")      || "",
+  deviceId: localStorage.getItem("sr_device")   || "ESP32_01",
+  interval: parseInt(localStorage.getItem("sr_interval") || "15"),
+};
+
+function openConfig() {
+  document.getElementById("cfgUrl").value      = cfg.url;
+  document.getElementById("cfgDevice").value   = cfg.deviceId;
+  document.getElementById("cfgInterval").value = cfg.interval;
+  document.getElementById("modalOverlay").classList.add("open");
+}
+function closeConfig() {
+  document.getElementById("modalOverlay").classList.remove("open");
+}
+function saveConfig() {
+  cfg.url      = document.getElementById("cfgUrl").value.trim();
+  cfg.deviceId = document.getElementById("cfgDevice").value.trim();
+  cfg.interval = parseInt(document.getElementById("cfgInterval").value) || 15;
+  localStorage.setItem("sr_url",      cfg.url);
+  localStorage.setItem("sr_device",   cfg.deviceId);
+  localStorage.setItem("sr_interval", cfg.interval);
+  closeConfig();
+  startAutoRefresh();
+  loadStatus();
+}
+
+// ─────────────────────────────────────────────
+//  API Calls
+// ─────────────────────────────────────────────
+async function gasGet(action, extra) {
+  if (!cfg.url) return null;
+  var url = cfg.url + "?action=" + action + (extra||"");
+  try {
+    var r = await fetch(url); return await r.json();
+  } catch(e) { console.error(action, e); return null; }
+}
+
+async function gasPost(body) {
+  if (!cfg.url) return null;
+  try {
+    var r = await fetch(cfg.url, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body),
+    });
+    return await r.json();
+  } catch(e) { console.error("POST", e); return null; }
+}
+
+// ─────────────────────────────────────────────
+//  Spinner
+// ─────────────────────────────────────────────
+var _loading = 0;
+function showLoading(on) {
+  _loading += on ? 1 : -1;
+  document.getElementById("spinner").classList.toggle("active", _loading > 0);
+}
+
+// ─────────────────────────────────────────────
+//  Load Status
+// ─────────────────────────────────────────────
+async function loadStatus() {
+  if (!cfg.url) {
+    document.getElementById("cmdStatus").textContent = "⚠️ กรุณาตั้งค่า URL ก่อน (⚙️ Config)";
+    return;
+  }
+  showLoading(true);
+  var d = await gasGet("status");
+  showLoading(false);
+  if (!d || d.error) return;
+
+  // Temperature
+  document.getElementById("tempVal").textContent = d.temperature !== undefined ? d.temperature.toFixed(1) : "–";
+
+  // Humidity
+  document.getElementById("humVal").textContent = d.humidity !== undefined ? d.humidity.toFixed(1) : "–";
+
+  // Lamp
+  var lampEl = document.getElementById("lampVal");
+  var lampInd = document.getElementById("lampIndicator");
+  if (d.lampStatus === "ON") {
+    lampEl.textContent = "ON"; lampEl.className = "stat-value v-lamp-on";
+    lampInd.textContent = "🟢 ON"; lampInd.style.color = "var(--green)";
+  } else {
+    lampEl.textContent = "OFF"; lampEl.className = "stat-value v-lamp-off";
+    lampInd.textContent = "🔴 OFF"; lampInd.style.color = "var(--red)";
+  }
+
+  // ESP32
+  var esp32El  = document.getElementById("esp32Val");
+  var esp32Sub = document.getElementById("esp32Sub");
+  if (d.esp32Status === "ONLINE") {
+    esp32El.textContent = "ONLINE"; esp32El.className = "stat-value v-online";
+  } else {
+    esp32El.textContent = "OFFLINE"; esp32El.className = "stat-value v-offline";
+  }
+  esp32Sub.textContent = d.lastUpdateFull || "";
+
+  // Last update
+  document.getElementById("lastUpdateTime").textContent = new Date().toLocaleTimeString("th-TH");
+
+  // Enable buttons
+  var online = d.esp32Status === "ONLINE";
+  document.getElementById("btnOn").disabled  = !online;
+  document.getElementById("btnOff").disabled = !online;
+}
+
+// ─────────────────────────────────────────────
+//  Charts
+// ─────────────────────────────────────────────
+var chartTemp, chartHum;
+var currentRange = "today";
+
+function setRange(r, btn) {
+  currentRange = r;
+  document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  loadHistory();
+}
+
+function _chartOpts(label, color) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+               tooltip: { callbacks: { label: ctx => " " + ctx.parsed.y.toFixed(1) + " " + label }}},
+    scales: {
+      x: { ticks: { color:"#94a3b8", maxRotation:45, font:{size:10} }, grid:{color:"#1e293b"} },
+      y: { ticks: { color:"#94a3b8" }, grid:{color:"#334155"} },
+    },
+  };
+}
+
+function _mkChart(id, label, color) {
+  var ctx = document.getElementById(id).getContext("2d");
+  return new Chart(ctx, {
+    type:"line",
+    data:{ labels:[], datasets:[{
+      label, data:[], borderColor:color, backgroundColor:color+"22",
+      borderWidth:2, pointRadius:3, fill:true, tension:0.35,
+    }]},
+    options: _chartOpts(label, color),
+  });
+}
+
+async function loadHistory() {
+  if (!cfg.url) return;
+  showLoading(true);
+  var d = await gasGet("history", "&range=" + currentRange);
+  showLoading(false);
+  if (!d || !d.rows) return;
+
+  var labels = d.rows.map(r => r.time);
+  var temps  = d.rows.map(r => r.temperature);
+  var hums   = d.rows.map(r => r.humidity);
+
+  if (!chartTemp) { chartTemp = _mkChart("chartTemp","°C","#f97316"); }
+  if (!chartHum)  { chartHum  = _mkChart("chartHum", "%", "#06b6d4"); }
+
+  chartTemp.data.labels = labels;
+  chartTemp.data.datasets[0].data = temps;
+  chartTemp.update();
+
+  chartHum.data.labels = labels;
+  chartHum.data.datasets[0].data = hums;
+  chartHum.update();
+}
+
+// ─────────────────────────────────────────────
+//  Send Command
+// ─────────────────────────────────────────────
+async function sendCommand(cmd) {
+  var st = document.getElementById("cmdStatus");
+  st.textContent = "⏳ กำลังส่งคำสั่ง " + cmd + "...";
+  st.style.color = "var(--yellow)";
+
+  document.getElementById("btnOn").disabled  = true;
+  document.getElementById("btnOff").disabled = true;
+
+  var res = await gasPost({
+    action  : "command",
+    deviceId: cfg.deviceId,
+    device  : "LAMP1",
+    command : cmd,
+  });
+
+  document.getElementById("btnOn").disabled  = false;
+  document.getElementById("btnOff").disabled = false;
+
+  if (res && res.commandId) {
+    st.textContent = "✅ ส่งคำสั่งแล้ว [" + res.commandId + "] รอ ESP32 ดึงคำสั่ง...";
+    st.style.color = "var(--green)";
+  } else {
+    st.textContent = "❌ ส่งคำสั่งไม่สำเร็จ";
+    st.style.color = "var(--red)";
+  }
+  setTimeout(() => { st.textContent = ""; }, 8000);
+}
+
+// ─────────────────────────────────────────────
+//  Auto Refresh
+// ─────────────────────────────────────────────
+var _refreshTimer = null;
+function startAutoRefresh() {
+  if (_refreshTimer) clearInterval(_refreshTimer);
+  var ms = Math.max(5, cfg.interval) * 1000;
+  _refreshTimer = setInterval(() => {
+    loadStatus();
+    loadHistory();
+  }, ms);
+}
+
+// ─────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────
+window.onload = function() {
+  if (!cfg.url) {
+    setTimeout(openConfig, 500);
+  } else {
+    loadStatus();
+    loadHistory();
+    startAutoRefresh();
+  }
+};
+</script>
+</body>
+</html>
